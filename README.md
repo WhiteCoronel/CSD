@@ -9,7 +9,7 @@ Simple tool with basic TUI to save both manifest and depot key for a Steam depot
 - Creation of a basic file (.csdg, which is a .txt with different extention) used to storage depot data.
 - Basic CDN file saving, allowing you to download the depot without the need to use Steam.
 - Basic TUI and FAQ for easier use.
-
+- Resumable Downlaods
 
 ## Limitations
 
