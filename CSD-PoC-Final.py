@@ -9,14 +9,11 @@ cdn = CDNClient(client)
 
 def login():
     """Handle user login, including anonymous login."""
-    username = input("Username (Leave empty for Anonymous logging): ")
-    if username:
-        password = input("Password: ")
-        TwoFA = input("2FA/Steam Guard Code: ")
-        client.login(username, password, two_factor_code=TwoFA)
+    Anon = input("Anonymous? (Y/N): ")
+    if Anon.upper() == 'N':
+        client.cli_login(input('Username: '), input('Password: '))
         if client.logged_on:
-            print(f'User {username.capitalize()} has been logged on successfully')
-            password = 'You saw nothing'
+            print('Login with Account successful')
     else:
         client.anonymous_login()
         if client.logged_on:
@@ -62,8 +59,9 @@ def add_csdg_data_to_client():
     manifest = cdn.get_manifest(app_id, depot_id, manifest_id)
 
 def download_game():
-    """Download game files based on the manifest."""
+    """Download game files based on the manifest with resumable support."""
     global app_id, depot_id, manifest_id, depot_key
+
     try:
         manifest = cdn.get_manifest(app_id, depot_id, manifest_id)
         manifest.decrypt_filenames(depot_key)
@@ -72,23 +70,49 @@ def download_game():
             return
         files = list(manifest.iter_files())
         print(f"Number of files to download: {len(files)}")
-        print("You might see permission errors; if they occur while making a directory/folder, there is nothing to worry about")
         input("Press enter to start downloading files...")
+
         for file in files:
-            print(f"Downloading {file.filename}...")
+            print(f"Downloading {file.filename}")
+            file_path = f'{app_id}/{file.filename}'
+            dir_path = os.path.dirname(file_path)
+            os.makedirs(dir_path, exist_ok=True)
+
+            # Skip directories
+            if file.is_directory:
+                print(f"Skipping directory {file.filename}")
+                continue
+
+            # Check if the file already exists and its size
+            existing_size = 0
+            if os.path.exists(file_path):
+                existing_size = os.path.getsize(file_path)
+                if existing_size == file.size:
+                    print(f"Skipping {file.filename} (already downloaded)")
+                    continue
+                elif existing_size > file.size:
+                    print(f"Corrupted file detected, deleting {file.filename}")
+                    os.remove(file_path)
+                    existing_size = 0
+                else:
+                    print(f"Resuming {file.filename} from {existing_size} bytes")
+
+            # Download the file starting from the existing size
             try:
-                content = file.readlines()
-                dir_path = os.path.dirname(f"{app_id}/{file.filename}")
-                os.makedirs(dir_path, exist_ok=True)
-                file_path = f'{app_id}/{file.filename}'
-                with open(file_path, 'wb') as file_out:
-                    for chunk in content:
+                with open(file_path, 'ab') as file_out:
+                    file.seek(existing_size)  # Seek to the position where the download left off
+                    while existing_size < file.size:
+                        chunk = file.read(min(1024 * 1024, file.size - existing_size))  # Read in 1 MB chunks
+                        if not chunk:
+                            break
                         file_out.write(chunk)
-                print(f"File {file.filename} saved successfully.")
+                        existing_size += len(chunk)
+                    print(f"File {file.filename} saved successfully.")
             except PermissionError as e:
                 print(f"Permission error while saving file {file.filename}: {e}")
             except Exception as e:
                 print(f"Unexpected error while saving file {file.filename}: {e}")
+
         print('Game Downloaded!')
         input('Press any key to continue')
     except Exception as e:
