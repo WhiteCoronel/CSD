@@ -14,9 +14,8 @@ Simple tool with basic TUI to save both manifest and depot key for a Steam depot
 ## Limitations
 
 - As of the current version (PoC) there is no error handling besides the file saving part, which means any error in the user part while filling information could result in a crash
-- Downloads are not resumable, and the current method it uses to download files is suboptimal to say the least.
-- Downloads are not resumable.
 - No support for games that require multiple depots to work.
+
 ## Planned Features
 
 - TUI using Rich library.
