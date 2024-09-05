@@ -163,13 +163,14 @@ class CSD:
         except Exception as e:
             return e
 
-def auto_make_csdg(csd, app_id: int) -> dict:
+def auto_make_csdg(csd, app_id: int, debug_print=False) -> dict:
     """
     Extracts and transforms application data into a structured dictionary.
 
     Args:
         csd: An object providing methods to get application and depot data.
         app_id: The ID of the application to retrieve and transform data for.
+        debug_print: If True, prints debug information.
 
     Returns:
         A dictionary containing the transformed application data.
@@ -178,53 +179,99 @@ def auto_make_csdg(csd, app_id: int) -> dict:
         ValueError: If no data is found for the given app_id.
         TypeError: If expected data structures are not dictionaries.
     """
-    # Get AppInfo
+    # List of Steamworks Common Redistributables
+    CSR = [
+        228981, 228982, 228983, 228984, 228985, 228986, 228987,
+        228988, 228989, 228990, 229000, 229001, 229002, 229003,
+        229004, 229005, 229006, 229007, 229010, 229011, 229012,
+        229020, 229030, 229031, 229032, 229033
+    ]
+
+    # Get application info
+    if debug_print:
+        print("Getting Information...")
+        
     data = csd.get_app_info(app_id)
     app_data = data['apps'].get(app_id, {})
     
     if not app_data:
         raise ValueError(f"No data found for app ID {app_id}")
 
+    if debug_print:
+        print("Setting Base Information...")
+        
     csdg = {
         "appID": app_id,
         "name": app_data['common']['name'],
         "oslist": app_data['common']['oslist'],
-        "osarch": int(app_data['common']['osarch']),
+        "osarch": app_data['common']['osarch'],
         "depots": {}
     }
 
-    for depot_id, depot_info in app_data['depots'].items():
-        if depot_id == 'branches':
-            continue
-        
-        if not isinstance(depot_info, dict):
+    for depot_id_str, depot_info in app_data['depots'].items():
+        # Skip non-numeric depot IDs, because they aren't 'depots' for us
+        if not depot_id_str.isdigit():
+            if debug_print:
+                print(f"Depot '{depot_id_str}' is not a number, skipped...")
             continue
 
+        depot_id = int(depot_id_str)
+
+        # Skip Steamworks Common Redistributables
+        if depot_id in CSR:
+            if debug_print:
+                print(f"Depot {depot_id} is a Steamworks Common Redistributable, skipped...")
+            continue
+
+        # Retrieve depot configuration and manifests
         config = depot_info.get('config', {})
         manifests = depot_info.get('manifests', {})
 
+        if debug_print:
+            print(f"Getting Key for {depot_id}...")
+            
+        key = str(csd.get_depot_key(app_id, depot_id))
+        
+        if debug_print:
+            print(f"Key: {key}")
+
+        if debug_print:
+            print(f"Getting Content for {depot_id}...")
+            
+        gid = int(manifests.get('public', {}).get('gid', '0'))
+        content = str(csd.get_manifest(app_id, depot_id, gid))
+        
+        if debug_print:
+            print(f"Got Content for {depot_id}")
+
+        # Validate data types
         if not isinstance(config, dict):
             raise TypeError(f"Expected dictionary for config but got {type(config).__name__}")
 
         if not isinstance(manifests, dict):
             raise TypeError(f"Expected dictionary for manifests but got {type(manifests).__name__}")
 
+        if debug_print:
+            print(f"Saving data of Depot {depot_id}")
+
+        # Populate csdg dictionary
         csdg["depots"][depot_id] = {
-            "key": csd.get_depot_key(app_id, int(depot_id)),
+            "key": key,
             "config": {
                 "osarch": config.get('osarch', '0'),
-                "oslist": config.get('oslist', 'Missing')
+                "oslist": config.get('oslist', 'Universal')
             },
             "manifests": {
                 "public": {
-                    "download": int(manifests.get('public', {}).get('download', '0')),  
-                    "gid": int(manifests.get('public', {}).get('gid', '0')),  
-                    "size": int(manifests.get('public', {}).get('size', '0')), 
-                    "content": csd.get_manifest(app_id, depot_id, int(manifests.get('public', {}).get('gid', '0')))
+                    "download": int(manifests.get('public', {}).get('download', '0')),
+                    "gid": gid,
+                    "size": int(manifests.get('public', {}).get('size', '0')),
+                    "content": content
                 }
             }
         }
 
+    # Write to file
     with open(f'CSDG/{app_id}.csdg', 'w') as file:
         json.dump(csdg, file, indent=6)
 
