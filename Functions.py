@@ -9,6 +9,7 @@ import steam.client.cdn
 import ast
 import json
 from typing import Union, Tuple
+import datetime
 
 class CSD:
     """
@@ -81,6 +82,17 @@ class CSD:
             return False
         except Exception as e:
             return e
+        
+    def logout(self):
+        try:
+            self.client.logout()
+            self.logged = False
+            self.login_type = 'Not Logged'
+            if self.client.logged_on:
+                return False
+            return True
+        except Exception as e:
+            return e
 
     def add_depot_key(self, depot_id: int, depot_key: str) -> Union[bool, Exception]:
         """
@@ -137,7 +149,7 @@ class CSD:
         except Exception as e:
             return e
 
-    def get_manifest(self, app_id: int, depot_id: int, manifest_id: int) -> Union[str, Exception]:
+    def get_manifest_content(self, app_id: int, depot_id: int, manifest_id: int) -> Union[str, Exception]:
         """
         Retrieves a manifest from the CDN.
 
@@ -162,6 +174,90 @@ class CSD:
             return info
         except Exception as e:
             return e
+        
+    def get_app_depot_info(self, app_id):
+        try:
+            info = self.cdn.get_app_depot_info(app_id)
+            return info
+        except Exception as e:
+            return e
+
+# Steamworks Common Redistributables list and names since they dont work like normal apps
+CSR = [
+        228981, 228982, 228983, 228984, 228985, 228986, 228987,
+        228988, 228989, 228990, 229000, 229001, 229002, 229003,
+        229004, 229005, 229006, 229007, 229010, 229011, 229012,
+        229020, 229030, 229031, 229032, 229033
+    ]
+
+def GetCSRName(CSR: int) -> str:
+    if CSR == 228981:
+        return 'Windows VC 2005 Redist'
+    elif CSR == 228982:
+        return 'Windows VC 2008 Redist'
+    elif CSR == 228983:
+        return 'Windows VC 2010 Redist'
+    elif CSR == 228984:
+        return 'Windows VC 2012 Redist'
+    elif CSR == 228985:
+        return 'Windows VC 2013 Redist'
+    elif CSR == 228986:
+        return 'Windows VC 2015 Redist'
+    elif CSR == 228987:
+        return 'Windows VC 2017 Redist'
+    elif CSR == 228988:
+        return 'Windows VC 2019 Redist'
+    elif CSR == 228989:
+        return 'Windows VC 2022 Redist'
+    elif CSR == 228990:
+        return 'Windows DirectX Jun 2010 Redist'
+    elif CSR == 229000:
+        return 'Windows .NET 3.5 Redist'
+    elif CSR == 229001:
+        return 'Windows .NET 3.5 Client Profile Redist'
+    elif CSR == 229002:
+        return 'Windows .NET 4.0 Redist'
+    elif CSR == 229003:
+        return 'Windows .NET 4.0 Client Profile Redist'
+    elif CSR == 229004:
+        return 'Windows .NET 4.5.2 Redist'
+    elif CSR == 229005:
+        return 'Windows .NET 4.6 Redist'
+    elif CSR == 229006:
+        return 'Windows .NET 4.7 Redist'
+    elif CSR == 229007:
+        return 'Windows .NET 4.8 Redist'
+    elif CSR == 229010:
+        return 'Windows XNA 3.0 Redist'
+    elif CSR == 229011:
+        return 'Windows XNA 3.1 Redist'
+    elif CSR == 229012:
+        return 'Windows XNA 4.0 Redist'
+    elif CSR == 229020:
+        return 'Windows OpenAL 2.0.7.0 Redist'
+    elif CSR == 229030:
+        return 'Windows PhysX System Software 8.09.04'
+    elif CSR == 229031:
+        return 'Windows PhysX System Software 9.12.1031'
+    elif CSR == 229032:
+        return 'Windows PhysX System Software 9.13.1220'
+    elif CSR == 229033:
+        return 'Windows PhysX System Software 9.14.0702'
+    else:
+        return 'Unknown CSR'
+
+def log_debug_print(content, do):
+    if do:
+        print(content)
+
+def dump(dump):
+    if type(dump) == dict:
+        with open('Logs/dump.json', 'w') as file:
+            json.dump(dump, file, indent=6)
+    else:
+        with open('Logs/dump.dump', 'w') as file:
+            file.write(str(dump))
+
 
 def auto_make_csdg(csd, app_id: int, debug_print=False) -> dict:
     """
@@ -180,100 +276,71 @@ def auto_make_csdg(csd, app_id: int, debug_print=False) -> dict:
         TypeError: If expected data structures are not dictionaries.
     """
     # List of Steamworks Common Redistributables
-    CSR = [
-        228981, 228982, 228983, 228984, 228985, 228986, 228987,
-        228988, 228989, 228990, 229000, 229001, 229002, 229003,
-        229004, 229005, 229006, 229007, 229010, 229011, 229012,
-        229020, 229030, 229031, 229032, 229033
-    ]
 
     # Get application info
-    if debug_print:
-        print("Getting Information...")
+    log_debug_print(f'Getting Information for {app_id}', debug_print)
         
     data = csd.get_app_info(app_id)
     app_data = data['apps'].get(app_id, {})
-    
-    if not app_data:
-        raise ValueError(f"No data found for app ID {app_id}")
+    log_debug_print(f'Got Information', debug_print)
 
-    if debug_print:
-        print("Setting Base Information...")
-        
-    csdg = {
-        "appID": app_id,
-        "name": app_data['common']['name'],
-        "oslist": app_data['common']['oslist'],
-        "osarch": app_data['common']['osarch'],
-        "depots": {}
-    }
+    log_debug_print(f'Setting Base Information', debug_print)
+    csdg = {}
+    csdg['loginType'] = csd.login_type
+    csdg['date'] = str(datetime.date.today())
+    csdg['appID'] = app_id
+    csdg['name'] = app_data['common']['name']
+    csdg['oslist']= app_data['common']['oslist']
+    csdg['osarch'] = app_data['common']['osarch']
+    csdg['depots'] = {}
+    log_debug_print(f'Set Base Information', debug_print)
 
-    for depot_id_str, depot_info in app_data['depots'].items():
-        # Skip non-numeric depot IDs, because they aren't 'depots' for us
-        if not depot_id_str.isdigit():
-            if debug_print:
-                print(f"Depot '{depot_id_str}' is not a number, skipped...")
+    for depot_id, depot_info in app_data['depots'].items():
+        if not depot_id.isdigit():
+            log_debug_print(f"Depot '{depot_id}' is not a number, skipped...", debug_print)
             continue
 
-        depot_id = int(depot_id_str)
+        depot_id = int(depot_id)
 
-        # Skip Steamworks Common Redistributables
-        if depot_id in CSR:
-            if debug_print:
-                print(f"Depot {depot_id} is a Steamworks Common Redistributable, skipped...")
-            continue
-
-        # Retrieve depot configuration and manifests
         config = depot_info.get('config', {})
         manifests = depot_info.get('manifests', {})
+        log_debug_print(f"Getting Name...", debug_print)
+        name = csd.get_app_info(depot_id).get('apps', {}).get(depot_id, {}).get('common', {}).get('name', 'no_name')
 
-        if debug_print:
-            print(f"Getting Key for {depot_id}...")
-            
-        key = str(csd.get_depot_key(app_id, depot_id))
-        
-        if debug_print:
-            print(f"Key: {key}")
-
-        if debug_print:
-            print(f"Getting Content for {depot_id}...")
-            
-        gid = int(manifests.get('public', {}).get('gid', '0'))
-        content = str(csd.get_manifest(app_id, depot_id, gid))
-        
-        if debug_print:
-            print(f"Got Content for {depot_id}")
-
-        # Validate data types
-        if not isinstance(config, dict):
-            raise TypeError(f"Expected dictionary for config but got {type(config).__name__}")
-
-        if not isinstance(manifests, dict):
-            raise TypeError(f"Expected dictionary for manifests but got {type(manifests).__name__}")
-
-        if debug_print:
-            print(f"Saving data of Depot {depot_id}")
-
-        # Populate csdg dictionary
-        csdg["depots"][depot_id] = {
-            "key": key,
-            "config": {
+        if depot_id in CSR:
+            log_debug_print(f'Depot is a Steamworks Common Redistributable', debug_print)
+            csdg['depots'][depot_id] = {
+                "name": GetCSRName(depot_id),
+                "config":{
                 "osarch": config.get('osarch', '0'),
-                "oslist": config.get('oslist', 'Universal')
-            },
-            "manifests": {
-                "public": {
-                    "download": int(manifests.get('public', {}).get('download', '0')),
-                    "gid": gid,
-                    "size": int(manifests.get('public', {}).get('size', '0')),
-                    "content": content
+                "oslist": config.get('oslist', 'universal'),
+                "optionaldlc": config.get('optionaldlc', 'no'),
+                "CSR": True
                 }
             }
-        }
+            continue
+        else:
+            log_debug_print(f'Depot {depot_id} qualifies for storage', debug_print)
+            content = str(csd.get_manifest_content(app_id, depot_id, int(manifests.get('public', {}).get('gid', '0'))))
+            key = str(csd.get_depot_key(app_id, depot_id))
+            csdg['depots'][depot_id] = {
+                "name": name,
+                "key": key,
+                "config":{
+                    "osarch": config.get('osarch', '0'),
+                    "oslist": config.get('oslist', 'universal'),
+                    "optionaldlc": config.get('optionaldlc', 'no'),
+                    "CSR": False
+                },
+                "manifests": {
+                    "public": {
+                        "download": int(manifests.get('public', {}).get('download', '0')),
+                        "gid": int(manifests.get('public', {}).get('gid', '0')),
+                        "size": int(manifests.get('public', {}).get('size', '0')),
+                        "content": content
+                    }
+                }
+            }
 
-    # Write to file
     with open(f'CSDG/{app_id}.csdg', 'w') as file:
         json.dump(csdg, file, indent=6)
-
-    return True
-

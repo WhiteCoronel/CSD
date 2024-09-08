@@ -47,8 +47,4 @@ def SetUp_Directories(directories: List[str]) -> None:
             if not os.path.exists(dir_path):
                 os.makedirs(dir_path)
         except OSError as e:
-            void()
-
-def void():
-    void = 'void'
-    # Basically a placeholder for when i decide to implement logs
+            'void'

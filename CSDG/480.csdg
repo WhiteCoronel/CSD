@@ -1,14 +1,28 @@
 {
+      "loginType": "Account Logging (CLI)",
+      "date": "2024-09-07",
       "appID": 480,
       "name": "Spacewar",
       "oslist": "windows,macos,linux",
       "osarch": "",
       "depots": {
+            "229006": {
+                  "name": "Windows .NET 4.7 Redist",
+                  "config": {
+                        "osarch": "0",
+                        "oslist": "windows",
+                        "optionaldlc": "no",
+                        "CSR": true
+                  }
+            },
             "481": {
+                  "name": "no_name",
                   "key": "410c88e63fbfc9d184683d5734c8d22d4948c70b6292273888197ad98b678db4",
                   "config": {
                         "osarch": "0",
-                        "oslist": "Universal"
+                        "oslist": "universal",
+                        "optionaldlc": "no",
+                        "CSR": false
                   },
                   "manifests": {
                         "public": {
